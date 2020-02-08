@@ -4,11 +4,15 @@
 
 ### New Features
 
-### Changes
+### Bugs fixed
 
 * [#663](https://github.com/clojure-emacs/cider-nrepl/pull/663): Fix non-recognized `recur` inside `case` in the debugger.
 * [#664](https://github.com/clojure-emacs/cider-nrepl/pull/664): Fix continue-all in conditional break.
 * [#665](https://github.com/clojure-emacs/cider-nrepl/pull/665): Fix form location in map literals.
+
+### Changes
+
+* [#641](https://github.com/clojure-emacs/cider-nrepl/pull/641): Integrate the new suitable ClojureScript completion.
 
 ## 0.23.0 (2019-01-18)
 
@@ -18,7 +22,7 @@
 * [#654](https://github.com/clojure-emacs/cider-nrepl/pull/654): Change the format of debugger command messages to a set of command names, leaving key mappings up to client implementations.
 * [#653](https://github.com/clojure-emacs/cider-nrepl/pull/653): Add `inspect-def-current-value` to inspect middleware.
 
-### Changes
+### Bugs fixed
 
 * [#661](https://github.com/clojure-emacs/cider-nrepl/pull/661): Fix `info` op not to return nil as a value of key.
 
