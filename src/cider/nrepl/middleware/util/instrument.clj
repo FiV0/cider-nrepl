@@ -161,7 +161,7 @@
            form))
        :else form))))
 
-(defn- contains-recur?
+(defn contains-recur?
   "Return true if form is not a `loop` or a `fn` and a `recur` is found in it."
   [form]
   (cond
@@ -210,16 +210,22 @@
   binding names in a let form are never instrumented).
   See `instrument-tagged-code` for more information."
   [form]
-  (condp #(%1 %2) form
-    ;; Function call, macro call, or special form.
-    seq? (doall (instrument-function-like-form form))
-    symbol? (with-break form)
-    ;; Other coll types are safe, so we go inside them and only
-    ;; instrument what's interesting.
-    ;; Do we also need to check for seq?
-    coll? (doall (instrument-coll form))
-    ;; Other things are uninteresting, literals or unreadable objects.
-    form))
+  (let [instrumented-form (condp #(%1 %2) form
+                            ;; Function call, macro call, or special form.
+                            seq? (doall (instrument-function-like-form form))
+                            symbol? (with-break form)
+                            ;; Other coll types are safe, so we go inside them and only
+                            ;; instrument what's interesting.
+                            ;; Do we also need to check for seq?
+                            coll? (doall (instrument-coll form))
+                            ;; Other things are uninteresting, literals or unreadable objects.
+                            form)
+        debug-state-function (::debug-state-function (meta form))
+        ;; extras (::extras (meta form))
+        ]
+    (if debug-state-function ;extras
+      (list debug-state-function instrumented-form)
+      instrumented-form)))
 
 ;;;; ## Pre-instrumentation
 ;;;
@@ -287,8 +293,10 @@
   This sets the ::breakfunction metadata of form, which can then be
   used by `instrument-tagged-code`. See this function for the meaning
   of breakfunction."
-  [form breakfunction]
-  (m/merge-meta form {::breakfunction breakfunction}))
+  ([form breakfunction] (m/merge-meta form {::breakfunction breakfunction}))
+  ([form breakfunction debug-state-function]
+   (m/merge-meta form {::breakfunction breakfunction
+                       ::debug-state-function debug-state-function})))
 
 (defn tag-form-recursively
   "Like `tag-form` but also tag all forms inside the given form."
@@ -390,3 +398,32 @@
       m/macroexpand-all)
   ;; Replace #'bp with 'bp for easier print and comparison.
   (walk/postwalk #(if (= % #'bp) 'bp %) @bp-tracker))
+
+;;scratch
+(comment
+  (require '[cider.nrepl.middleware.debug :refer [debug-reader]])
+  (binding [*data-readers* (assoc *data-readers* 'dbg debug-reader)]
+    (def dbg-form-case (read-string
+                        "(loop [i 0] 
+                        #dbg ^{:break/when (= i 7)}
+                      (when (< i 10)
+                        (println i)
+                        (recur (inc i))))")))
+
+  (binding [*data-readers* (assoc *data-readers* 'dbg debug-reader)]
+    (read-string "#dbg (+ 1 2)"))
+
+
+  dbg-form-case
+
+
+
+  (-> (walk-indexed (fn [i f] (m/merge-meta f {::extras {:coor i}}))
+                    dbg-form-case)
+      ;; Expand so we don't have to deal with macros.
+      (m/macroexpand-all ::original-form)
+      ;; Go through everything again, and instrument any form with
+      ;; debug metadata.
+      (instrument)
+      (strip-instrumentation-meta)
+      (print-form true true)))

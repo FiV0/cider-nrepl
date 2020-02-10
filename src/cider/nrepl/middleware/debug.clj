@@ -490,6 +490,11 @@ this map (identified by a key), and will `dissoc` it afterwards."}
                     :forms @*tmp-forms*}]
      ~@body))
 
+(defmacro wrap-in-debug-bindings
+  {:style/indent 1}
+  [form]
+  `(with-initial-debug-bindings ~form))
+
 (defmacro breakpoint-with-initial-debug-bindings
   {:style/indent 1}
   [form dbg-state original-form]
@@ -545,6 +550,22 @@ this map (identified by a key), and will `dissoc` it afterwards."}
   When instrumenting, these will not be wrapped in a breakpoint."
   '#{def fn* deftype* reify* monitor-enter monitor-exit})
 
+(defn push-meta-deeper [form deeper? meta]
+  (letfn [(apply-if-possible [form]
+            (if (deeper? form)
+              (push-meta-deeper form deeper? meta)
+              (m/merge form meta)))
+          (map-inner [form]
+            (map apply-if-possible form))] 
+    (cond
+      (map? form) (into {} (map (fn [[k v]] [(apply-if-possible k) (apply-if-possible v)]) form))  
+      (set? form) (into #{} (map-inner form)) 
+      (list? form) (map-inner form)
+      (instance? clojure.lang.IMapEntry form) (vec (map-inner form))
+      (seq? form)  (doall (map-inner form))
+      (coll? form) (into (empty form) (map-inner form))
+      :else form)))
+
 (defmacro breakpoint-if-interesting
   "Wrap form in a breakpoint if it looks interesting.
   Uninteresting forms are symbols that resolve to `clojure.core`
@@ -561,7 +582,9 @@ this map (identified by a key), and will `dissoc` it afterwards."}
                (irrelevant-return-value-forms (first form))))
     form
     (let [condition (:break/when (meta form))]
-      (if condition
+      (cond
+        (and condition (ins/contains-recur? form))
+        condition
         ;; If there is a condition and it is falsy, we need to skip
         ;; the current level (:deeper than parent coor), but only
         ;; once. Next time, we need to test the condition again.
@@ -574,7 +597,7 @@ this map (identified by a key), and will `dissoc` it afterwards."}
              ;; we don't want go back to the old-breaks
              (finally (when (not= :all (:mode @*skip-breaks*))
                         (reset! *skip-breaks* old-breaks#)))))
-        `(expand-break ~form ~dbg-state ~original-form)))))
+        :else `(expand-break ~form ~dbg-state ~original-form)))))
 
 ;;; ## Data readers
 ;;
@@ -582,14 +605,14 @@ this map (identified by a key), and will `dissoc` it afterwards."}
 (defn breakpoint-reader
   "#break reader. Mark `form` for breakpointing."
   [form]
-  (ins/tag-form form #'breakpoint-with-initial-debug-bindings))
+  (ins/tag-form form #'breakpoint-if-interesting #'with-initial-debug-bindings))
 
 (defn debug-reader
   "#dbg reader. Mark all forms in `form` for breakpointing.
   `form` itself is also marked."
   [form]
   (ins/tag-form (ins/tag-form-recursively form #'breakpoint-if-interesting)
-                #'breakpoint-with-initial-debug-bindings))
+                #'breakpoint-if-interesting #'with-initial-debug-bindings))
 
 (defn instrument-and-eval [form]
   (let [form1 (ins/instrument-tagged-code form)]
