@@ -661,3 +661,11 @@
   (--> :continue-all)
   (<-- {:value "{:transport 23}"})
   (<-- {:status ["done"]}))
+
+(deftest reader-conditional-test
+  (--> :eval
+       " #dbg (inc #?(:cljs (+ 2 3) :clj (+ 1 2)))")
+  (<-- {:debug-value "3" :coor [1 3]}) ; (+ 1 2) 
+  (--> :next)
+  (<-- {:value "4"}) ; (inc ...)
+  (<-- {:status ["done"]}))

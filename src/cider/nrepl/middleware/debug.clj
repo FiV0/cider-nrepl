@@ -591,8 +591,14 @@ this map (identified by a key), and will `dissoc` it afterwards."}
   (ins/tag-form (ins/tag-form-recursively form #'breakpoint-if-interesting)
                 #'breakpoint-with-initial-debug-bindings))
 
+(defn- reread
+  "Takes a Clojure form and reads it. Used to remove reader conditionals."
+  [form]
+  (-> (m/macroexpand-all form)
+      (as-> form (read-string {:read-cond :allow} (pr-str form)))))
+
 (defn instrument-and-eval [form]
-  (let [form1 (ins/instrument-tagged-code form)]
+  (let [form1 (reread (ins/instrument-tagged-code form))]
     ;; (ins/print-form form1 true false)
     (try
       (binding [*tmp-forms* (atom {})]
@@ -630,7 +636,9 @@ this map (identified by a key), and will `dissoc` it afterwards."}
       ;; Technically, `instrument-and-eval` acts like a regular eval
       ;; if there are no debugging macros. But we still only use it
       ;; when we know it's necessary.
-      (assoc msg :eval "cider.nrepl.middleware.debug/instrument-and-eval")
+      (assoc msg
+             :eval "cider.nrepl.middleware.debug/instrument-and-eval"
+             :read-cond :preserve)
       ;; If there was no reader macro, fallback on regular eval.
       msg)))
 

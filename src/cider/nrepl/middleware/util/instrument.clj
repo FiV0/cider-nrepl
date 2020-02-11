@@ -87,9 +87,9 @@
                       (list* (m/merge-meta sym
                                            ;; Instrument the metadata, because
                                            ;; that's where tests are stored.
-                               (instrument (or (meta sym) {}))
+                                           (instrument (or (meta sym) {}))
                                            ;; to be used later for meta stripping
-                               {::def-symbol true})
+                                           {::def-symbol true})
                              (map instrument (rest args))))
             '#{set!} (list (first args)
                            (instrument (second args)))
@@ -100,7 +100,7 @@
             '#{reify* deftype*} (map #(if (seq? %)
                                         (let [[a1 a2 & ar] %]
                                           (m/merge-meta (list* a1 a2 (instrument-coll ar))
-                                            (meta %)))
+                                                        (meta %)))
                                         %)
                                      args)
             ;; `fn*` has several possible syntaxes.
@@ -126,6 +126,19 @@
               (println "Failed to instrument" name args
                        ", please file a bug report: " e))
             args))))
+
+(definstrumenter instrument-reader-conditional
+  "Instrument a form representing a conditional reader."
+  [read-cond]
+  (let [reader-condition-map (->> (:form read-cond)
+                                  (partition 2)
+                                  (map vec)
+                                  (into {}))]
+    (if (:clj reader-condition-map)
+      (instrument (m/macroexpand-all
+                   (:clj reader-condition-map)
+                   ::original-form))
+      nil)))
 
 ;;;; ### Instrumenting Functions and Collections
 ;;;
@@ -226,6 +239,7 @@
     ;; instrument what's interesting.
     ;; Do we also need to check for seq?
     coll? (doall (instrument-coll form))
+    reader-conditional? (with-break (instrument-reader-conditional form))
     ;; Other things are uninteresting, literals or unreadable objects.
     form))
 
@@ -271,6 +285,10 @@
                   (instance? clojure.lang.IMapEntry form) (vec (map-inner form))
                   (seq? form)  (doall (map-inner form))
                   (coll? form) (into (empty form) (map-inner form))
+                  ;; looked at the implementation of clojure.lang.ReaderConditional
+                  (reader-conditional? form) (reader-conditional
+                                              (map-inner (:form form)) (:splicing? form))
+
                   :else form)]
      (f coor (m/merge-meta result (meta form))))))
 
