@@ -85,11 +85,11 @@
                          (instrument-coll (rest (rest args))))
             '#{def} (let [sym (first args)]
                       (list* (m/merge-meta sym
-                                           ;; Instrument the metadata, because
-                                           ;; that's where tests are stored.
-                                           (instrument (or (meta sym) {}))
-                                           ;; to be used later for meta stripping
-                                           {::def-symbol true})
+                                         ;; Instrument the metadata, because
+                                         ;; that's where tests are stored.
+                               (instrument (or (meta sym) {}))
+                                         ;; to be used later for meta stripping
+                               {::def-symbol true})
                              (map instrument (rest args))))
             '#{set!} (list (first args)
                            (instrument (second args)))
@@ -100,7 +100,7 @@
             '#{reify* deftype*} (map #(if (seq? %)
                                         (let [[a1 a2 & ar] %]
                                           (m/merge-meta (list* a1 a2 (instrument-coll ar))
-                                                        (meta %)))
+                                            (meta %)))
                                         %)
                                      args)
             ;; `fn*` has several possible syntaxes.
@@ -164,6 +164,7 @@
    (let [{extras ::extras
           [_ orig] ::original-form
           bf   ::breakfunction
+          ;; see tag/form for an explanation of ::injected?
           injected? ::injected?} (meta form)]
      (cond
        (or (and bf extras) (and bf injected?))
@@ -291,7 +292,6 @@
                                               (map-inner (:form form)) (:splicing? form))
 
                   :else form)]
-     ;; #dbg ^{:break/when (and (list? form) (= (first form) (symbol 'do)))}
      (if (::injected? (meta form))
        (m/merge-meta (map #(walk-indexed f %) form) (meta form))
        (f coor (m/merge-meta result (meta form)))))))
@@ -316,7 +316,12 @@
   "Tag form to be instrumented with breakfunction.
   This sets the ::breakfunction metadata of form, which can then be
   used by `instrument-tagged-code`. See this function for the meaning
-  of breakfunction."
+  of breakfunction.
+
+  We additionaly allow wrapping a form (for example with a do statement)
+  for objects that don't support metadata. Marking this form as injected?
+  via metadata ({::injected? true}) will ignore it later on in the instrumentation
+  phase."
   ([form breakfunction] (tag-form form breakfunction false))
   ([form breakfunction toplevel?]
    (if (and toplevel? (not (instance? clojure.lang.IObj form)))

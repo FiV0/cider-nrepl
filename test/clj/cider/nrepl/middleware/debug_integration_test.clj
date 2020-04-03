@@ -441,11 +441,11 @@
   (--> :next)
   (<-- {:debug-value "7" :coor [1 1]}) ; (+ 2 (+ 3 2))
   (--> :next)
-  (<-- {:debug-value "4" :coor [1 2]}) ; (inc 3) 
+  (<-- {:debug-value "4" :coor [1 2]}) ; (inc 3)
   (--> :next)
-  (<-- {:debug-value "12345" :coor [1 3]}) ; (+ 12345) 
+  (<-- {:debug-value "12345" :coor [1 3]}) ; (+ 12345)
   (--> :next)
-  (<-- {:value "([1 7] [4 12345])"}) ; (seq ...) 
+  (<-- {:value "([1 7] [4 12345])"}) ; (seq ...)
   (<-- {:status ["done"]}))
 
 (deftest larger-literal-map-test
@@ -455,7 +455,7 @@
   (--> :next)
   (<-- {:debug-value "17" :coor [1 15]}) ; (inc 15)
   (--> :next)
-  (<-- {:debug-value "19" :coor [1 17]}) ; (inc 18) 
+  (<-- {:debug-value "19" :coor [1 17]}) ; (inc 18)
   (--> :next)
   (<-- {:value "9"}) ; (count ...)
   (<-- {:status ["done"]}))
@@ -665,7 +665,14 @@
 (deftest reader-conditional-test
   (--> :eval
        " #dbg (inc #?(:cljs (+ 2 3) :clj (+ 1 2)))")
-  (<-- {:debug-value "3" :coor [1 3]}) ; (+ 1 2) 
+  (<-- {:debug-value "3" :coor [1 3]}) ; (+ 1 2)
   (--> :next)
   (<-- {:value "4"}) ; (inc ...)
+  (<-- {:status ["done"]})
+
+  (--> :eval
+       " #dbg #?(:cljs (+ 2 3) :clj (+ 1 2)))")
+  (<-- {:debug-value "3" :coor [3]}) ; (+ 1 2)
+  (--> :next)
+  (<-- {:value "3"}) ; (inc ...)
   (<-- {:status ["done"]}))
