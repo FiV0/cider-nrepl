@@ -10,7 +10,6 @@
    [cider.nrepl.middleware.util.nrepl :refer [notify-client]]
    [nrepl.middleware.interruptible-eval :refer [*msg*]]
    [nrepl.middleware.print :as print]
-   [nrepl.middleware.session :as session]
    [nrepl.misc :refer [response-for]]
    [nrepl.transport :as transport]
    [orchard.info :as info]
@@ -582,14 +581,14 @@ this map (identified by a key), and will `dissoc` it afterwards."}
 (defn breakpoint-reader
   "#break reader. Mark `form` for breakpointing."
   [form]
-  (ins/tag-form form #'breakpoint-with-initial-debug-bindings))
+  (ins/tag-form form #'breakpoint-with-initial-debug-bindings true))
 
 (defn debug-reader
   "#dbg reader. Mark all forms in `form` for breakpointing.
   `form` itself is also marked."
   [form]
   (ins/tag-form (ins/tag-form-recursively form #'breakpoint-if-interesting)
-                #'breakpoint-with-initial-debug-bindings))
+                #'breakpoint-with-initial-debug-bindings true))
 
 (defn- reread
   "Takes a Clojure form and reads it. Used to remove reader conditionals."

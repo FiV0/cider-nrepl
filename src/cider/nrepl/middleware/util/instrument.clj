@@ -163,9 +163,10 @@
   ([form]
    (let [{extras ::extras
           [_ orig] ::original-form
-          bf   ::breakfunction} (meta form)]
+          bf   ::breakfunction
+          injected? ::injected?} (meta form)]
      (cond
-       (and bf extras)
+       (or (and bf extras) (and bf injected?))
        (list bf form extras orig)
        ;; If the form is a list and has no metadata, maybe it was
        ;; destroyed by a macro. Try guessing the extras by looking at
@@ -290,7 +291,10 @@
                                               (map-inner (:form form)) (:splicing? form))
 
                   :else form)]
-     (f coor (m/merge-meta result (meta form))))))
+     ;; #dbg ^{:break/when (and (list? form) (= (first form) (symbol 'do)))}
+     (if (::injected? (meta form))
+       (m/merge-meta (map #(walk-indexed f %) form) (meta form))
+       (f coor (m/merge-meta result (meta form)))))))
 
 (defn coord<
   "Return true if coordinate x comes before y.
@@ -313,8 +317,11 @@
   This sets the ::breakfunction metadata of form, which can then be
   used by `instrument-tagged-code`. See this function for the meaning
   of breakfunction."
-  [form breakfunction]
-  (m/merge-meta form {::breakfunction breakfunction}))
+  ([form breakfunction] (tag-form form breakfunction false))
+  ([form breakfunction toplevel?]
+   (if (and toplevel? (not (instance? clojure.lang.IObj form)))
+     (m/merge-meta `(do ~form) {::breakfunction breakfunction ::injected? true})
+     (m/merge-meta form {::breakfunction breakfunction}))))
 
 (defn tag-form-recursively
   "Like `tag-form` but also tag all forms inside the given form."
